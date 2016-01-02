@@ -12,8 +12,8 @@ class Application extends \base\Base {
     }
 
     public function handleRequest($request) {
-        list($router, $params) = $request->resolve();
-        $response = $this->runAction($router, $params);
+        $router = $request->resolve();
+        $response = $this->runAction($router);
     }
 
     public function getRequest() {
@@ -21,8 +21,17 @@ class Application extends \base\Base {
         return $request;
     }
 
-    public function runAction($router, $params) {
-    
+    public function runAction($router) {
+        $router = array ( 'router' => array ( 'c' => 'default', 'a' => 'index', ), 'params' => array ( ), );
+        $c = $router['router']['c'] . "Controller";
+        $a = $router['router']['a'] . "Action";
+        $p = $router['params'];
+        try {
+            $controller = new $c;
+            $controller->$a($p);
+        } catch (Exception $e) {
+        
+        }
     }
 
 }

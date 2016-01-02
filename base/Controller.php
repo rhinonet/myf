@@ -7,22 +7,21 @@ class Controller extends Base implements Viewable {
     public $defaultAction = "index";
 
     public function __construct() {
-    
+        parent::__construct();    
     }
 
     public function getView() {
-        if ($_view == null) {
-            $_view = \base\View::Instance();
-        }
+        $_view = new View;
         return $_view;
     }
 
-    public function setViewPath() {
-        $this->_viewPath = "";
+    public function render($view, $params) {
+        $content = $this->getView()->render($view, $params);
+        return $content;
     }
 
-    public function render($view, $params) {
-        $this->_view->render($this->_viewPath, $view, $params);
+    public function setViewPath() {
+    
     }
 
     public function __destruct() {

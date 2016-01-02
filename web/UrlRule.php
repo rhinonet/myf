@@ -4,21 +4,7 @@ namespace web;
 class UrlRule extends \base\Base  implements Urlable{ 
     const PARSING_ONLY = 1;
     const CREATION_ONLY = 2;
-    public $name;
-    public $pattern;
-    public $host;
-    public $route;
-    public $defaults = [];
-    public $suffix;
-    public $verb;
-    public $mode;
-    public $encodeParams = true;
-    protected $placeholders = [];
-    private $_template;
-    private $_routeRule;
-    private $_paramRules = [];
-    private $_routeParams = [];
-    
+   
     public $ruleConfig = array(
         'parse_only',
         'create_only',
@@ -32,55 +18,46 @@ class UrlRule extends \base\Base  implements Urlable{
     }
 
     public function parseRequest($manager, $request) {
-        $pathInfo = $request->getPathInfo();
-        $suffix = (string)($this->suffix === null ? $manager->suffix : $this->suffix);
-        var_dump($suffix, $manager->suffix);exit;
-        if ($suffix !== '' && $pathInfo !== '') {
-            $n = strlen($suffix);
-            if (substr_compare($pathInfo, $suffix, -$n, $n) === 0) {
-                $pathInfo = substr($pathInfo, 0, -$n);
-                if ($pathInfo === '') {
-                    // suffix alone is not allowed
-                    return false;
-                }
-            } else {
-                return false;
-            }
-        }
+        $defaultController = "default";
+        $defaultAction = "index";
+        $params = array();
 
-        if ($this->host !== null) {
-            $pathInfo = strtolower($request->getHostInfo()) . ($pathInfo === '' ? '' : '/' . $pathInfo);
-        }
-
-        if (!preg_match($this->pattern, $pathInfo, $matches)) {
-            return false;
-        }
-        $matches = $this->substitutePlaceholderNames($matches);
-
-        foreach ($this->defaults as $name => $value) {
-            if (!isset($matches[$name]) || $matches[$name] === '') {
-                $matches[$name] = $value;
+        if (isset($_SERVER['HTTP_X_REWRITE_URL'])) { // IIS
+            $requestUri = $_SERVER['HTTP_X_REWRITE_URL'];
+        } elseif (isset($_SERVER['REQUEST_URI'])) {
+            $requestUri = $_SERVER['REQUEST_URI'];
+            if ($requestUri !== '' && $requestUri[0] !== '/') {
+                $requestUri = preg_replace('/^(http|https):\/\/[^\/]+/i', '', $requestUri);
             }
-        }
-        $params = $this->defaults;
-        $tr = [];
-        foreach ($matches as $name => $value) {
-            if (isset($this->_routeParams[$name])) {
-                $tr[$this->_routeParams[$name]] = $value;
-                unset($params[$name]);
-            } elseif (isset($this->_paramRules[$name])) {
-                $params[$name] = $value;
+        } elseif (isset($_SERVER['ORIG_PATH_INFO'])) { // IIS 5.0 CGI
+            $requestUri = $_SERVER['ORIG_PATH_INFO'];
+            if (!empty($_SERVER['QUERY_STRING'])) {
+                $requestUri .= '?' . $_SERVER['QUERY_STRING'];
             }
-        }
-        if ($this->_routeRule !== null) {
-            $route = strtr($this->route, $tr);
         } else {
-            $route = $this->route;
+            exit('Unable to determine the request URI.');
         }
 
-        Yii::trace("Request parsed with URL rule: {$this->name}", __METHOD__);
-
-        return [$route, $params];
+        $urlArr = explode('?', $requestUri);
+        if (count($urlArr) === 2) {
+            $p = array_pop($urlArr);
+            $pArr = explode('&', $p);
+            if (count($pArr) > 0) {
+                foreach ($pArr as $pstr) {
+                    if (preg_match('/c=[\w]+/', $pstr)) {
+                        $defaultController = trim(array_pop(explode('=', $pstr)));
+                    } elseif (preg_match('/a=[\w]+/', $pstr)) {
+                        $defaultAction = trim(array_pop(explode('=', $pstr)));
+                    } elseif (preg_match('/[\w]+=[\w]+/', $pstr)) {
+                        $k = trim(array_shift(explode('=', $pstr)));
+                        $v = trim(array_pop(explode('=', $pstr)));
+                        $params[$k] = $v;
+                    }
+                }
+            }
+        } 
+        
+        return array('router'=>array('c'=>$defaultController, 'a' => $defaultAction), 'params' => $params);
     }
 
     public function createUrl($manager, $route, $params)
